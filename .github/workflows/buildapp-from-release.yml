@@ -1,4 +1,4 @@
-name: Build RyukGram from Release
+name: Build sideloaded IPA from Release Assets
 
 on:
     workflow_dispatch:
@@ -43,6 +43,7 @@ concurrency:
 
 env:
     UPSTREAM_REPO: faroukbmiled/RyukGram
+    HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
 
 jobs:
     build:
@@ -66,9 +67,6 @@ jobs:
             - name: Install Dependencies
               run: brew install dpkg
 
-            - name: Trust Homebrew tap
-              run: brew trust aws/tap
-
             - name: Install IPA tooling (cyan + ipapatch)
               run: |
                 pip install --force-reinstall https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
@@ -88,6 +86,7 @@ jobs:
                 if [ -n "$INPUT_TAG" ]; then
                   TAG="$INPUT_TAG"
                 elif [ "$INPUT_TARGET" = "410" ]; then
+                  # Newest release whose tag ends in -410.
                   TAG="$(gh release list --repo "$UPSTREAM_REPO" --limit 50 --json tagName -q '[.[].tagName | select(endswith("-410"))][0] // empty')"
                   [ -n "$TAG" ] || { echo "::error::No -410 release found on $UPSTREAM_REPO."; exit 1; }
                 else
