@@ -99,15 +99,22 @@ jobs:
                 echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
                 echo "Using release tag: ${TAG} (version ${VERSION})"
 
-            - name: Download release assets (curl direct links)
+            - name: Download release assets (verified curl)
               run: |
                 mkdir -p packages
-                # These commands download the files directly from the URLs provided in the release
-                curl -L -o packages/RyukGram_1.3.2_rootless.deb https://github.com/faroukbmiled/RyukGram/releases/download/$TAG/RyukGram_1.3.2_rootless.deb
-                curl -L -o packages/zxPluginsInject_v1.3.2.dylib https://github.com/faroukbmiled/RyukGram/releases/download/$TAG/zxPluginsInject_v1.3.2.dylib
-                curl -L -o packages/NoPluginsPatch_v1.3.2.dylib https://github.com/faroukbmiled/RyukGram/releases/download/$TAG/NoPluginsPatch_v1.3.2.dylib
+                # Add -L and use the raw URL format to ensure we get the binary
+                curl -L -o packages/RyukGram_1.3.2_rootless.deb "https://github.com/faroukbmiled/RyukGram/releases/download/$TAG/RyukGram_1.3.2_rootless.deb"
+                curl -L -o packages/zxPluginsInject_v1.3.2.dylib "https://github.com/faroukbmiled/RyukGram/releases/download/$TAG/zxPluginsInject_v1.3.2.dylib"
+                curl -L -o packages/NoPluginsPatch_v1.3.2.dylib "https://github.com/faroukbmiled/RyukGram/releases/download/$TAG/NoPluginsPatch_v1.3.2.dylib"
                 
-                # Set environment variables for next steps
+                # Verification step: Ensure the file isn't just an HTML page
+                echo "Verifying file types..."
+                if grep -q "<!DOCTYPE html>" packages/RyukGram_1.3.2_rootless.deb; then
+                  echo "::error::Downloaded file is an HTML page, not a .deb binary."
+                  cat packages/RyukGram_1.3.2_rootless.deb
+                  exit 1
+                fi
+                
                 echo "DEB=packages/RyukGram_1.3.2_rootless.deb" >> "$GITHUB_ENV"
                 echo "ZX_DYLIB=packages/zxPluginsInject_v1.3.2.dylib" >> "$GITHUB_ENV"
                 echo "NP_DYLIB=packages/NoPluginsPatch_v1.3.2.dylib" >> "$GITHUB_ENV"
