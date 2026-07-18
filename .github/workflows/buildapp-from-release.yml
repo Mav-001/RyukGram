@@ -106,27 +106,27 @@ jobs:
                 set -euo pipefail
                 mkdir -p packages release-assets
 
-                # Explicitly downloading specific assets based on file names observed
+                # Explicitly target the files seen in your screenshot
                 gh release download "$TAG" --repo "$UPSTREAM_REPO" --dir release-assets \
-                  --pattern "*rootless.deb" --pattern "*_v*.dylib"
+                  --pattern "RyukGram_1.3.2_rootless.deb" \
+                  --pattern "zxPluginsInject_v1.3.2.dylib" \
+                  --pattern "NoPluginsPatch_v1.3.2.dylib"
 
-                DEB="$(ls -t release-assets/*rootless.deb 2>/dev/null | head -n1 || true)"
-                [ -n "$DEB" ] || { echo "::error::Rootless .deb not found in release $TAG."; exit 1; }
+                DEB="$(ls -t release-assets/RyukGram_1.3.2_rootless.deb 2>/dev/null | head -n1 || true)"
+                [ -n "$DEB" ] || { echo "::error::Rootless .deb not found."; exit 1; }
                 echo "DEB=${DEB}" >> "$GITHUB_ENV"
 
                 if [ "${{ inputs.build_sideload }}" = "true" ]; then
-                  ZX_DYLIB="$(ls -t release-assets/zxPluginsInject_v*.dylib 2>/dev/null | head -n1 || true)"
+                  ZX_DYLIB="$(ls -t release-assets/zxPluginsInject_v1.3.2.dylib 2>/dev/null | head -n1 || true)"
                   [ -n "$ZX_DYLIB" ] || { echo "::error::zxPluginsInject dylib not found."; exit 1; }
                   echo "ZX_DYLIB=${ZX_DYLIB}" >> "$GITHUB_ENV"
                 fi
 
                 if [ "${{ inputs.build_noplugins }}" = "true" ]; then
-                  NP_DYLIB="$(ls -t release-assets/NoPluginsPatch_v*.dylib 2>/dev/null | head -n1 || true)"
+                  NP_DYLIB="$(ls -t release-assets/NoPluginsPatch_v1.3.2.dylib 2>/dev/null | head -n1 || true)"
                   [ -n "$NP_DYLIB" ] || { echo "::error::NoPluginsPatch dylib not found."; exit 1; }
                   echo "NP_DYLIB=${NP_DYLIB}" >> "$GITHUB_ENV"
                 fi
-
-                ls -la release-assets
 
             - name: Extract dylib + bundle from rootless deb
               run: |
