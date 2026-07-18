@@ -1,4 +1,4 @@
-name: Build sideloaded IPA from Release Assets
+name: Build RyukGram from Release
 
 on:
     workflow_dispatch:
@@ -88,7 +88,6 @@ jobs:
                 if [ -n "$INPUT_TAG" ]; then
                   TAG="$INPUT_TAG"
                 elif [ "$INPUT_TARGET" = "410" ]; then
-                  # Newest release whose tag ends in -410.
                   TAG="$(gh release list --repo "$UPSTREAM_REPO" --limit 50 --json tagName -q '[.[].tagName | select(endswith("-410"))][0] // empty')"
                   [ -n "$TAG" ] || { echo "::error::No -410 release found on $UPSTREAM_REPO."; exit 1; }
                 else
@@ -149,7 +148,6 @@ jobs:
                 cp -R "$BUNDLE_SRC" packages/RyukGram.bundle
 
                 if [ "${{ inputs.build_sideload }}" = "true" ]; then
-                  # Match the @rpath LC that ipapatch writes into target binaries.
                   cp "$ZX_DYLIB" packages/zxPluginsInject.dylib
                   install_name_tool -id "@rpath/zxPluginsInject.dylib" packages/zxPluginsInject.dylib 2>/dev/null || true
                 fi
@@ -181,8 +179,6 @@ jobs:
                   -f packages/RyukGram.dylib packages/RyukGram.bundle \
                   -c 9 -m 15.0 -du
 
-                # Embed Safari "Open in Instagram" extension before ipapatch
-                # re-signs, so instagram.com links open the app.
                 APPEX_SRC="extensions/OpenInstagramSafariExtension.appex"
                 if [ -d "$APPEX_SRC" ]; then
                   echo "Embedding Safari extension"
@@ -219,7 +215,6 @@ jobs:
                   -f packages/RyukGram.dylib packages/NoPluginsPatch.dylib packages/RyukGram.bundle \
                   -c 9 -m 15.0 -du
 
-                # No-plugins: strip every app extension (no ipapatch, no Safari ext).
                 INJECT_TMP="$(mktemp -d)"
                 unzip -q packages/RyukGram-noplugins.ipa -d "$INJECT_TMP"
                 APP_DIR="$(find "$INJECT_TMP/Payload" -maxdepth 1 -type d -name '*.app' | head -1)"
