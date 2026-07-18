@@ -86,7 +86,6 @@ jobs:
                 if [ -n "$INPUT_TAG" ]; then
                   TAG="$INPUT_TAG"
                 elif [ "$INPUT_TARGET" = "410" ]; then
-                  # Newest release whose tag ends in -410.
                   TAG="$(gh release list --repo "$UPSTREAM_REPO" --limit 50 --json tagName -q '[.[].tagName | select(endswith("-410"))][0] // empty')"
                   [ -n "$TAG" ] || { echo "::error::No -410 release found on $UPSTREAM_REPO."; exit 1; }
                 else
@@ -107,25 +106,23 @@ jobs:
                 set -euo pipefail
                 mkdir -p packages release-assets
 
+                # Explicitly downloading specific assets based on file names observed
                 gh release download "$TAG" --repo "$UPSTREAM_REPO" --dir release-assets \
-                  --pattern "RyukGram_*_rootless.deb"
-                DEB="$(ls -t release-assets/RyukGram_*_rootless.deb 2>/dev/null | head -n1 || true)"
+                  --pattern "*rootless.deb" --pattern "*_v*.dylib"
+
+                DEB="$(ls -t release-assets/*rootless.deb 2>/dev/null | head -n1 || true)"
                 [ -n "$DEB" ] || { echo "::error::Rootless .deb not found in release $TAG."; exit 1; }
                 echo "DEB=${DEB}" >> "$GITHUB_ENV"
 
                 if [ "${{ inputs.build_sideload }}" = "true" ]; then
-                  gh release download "$TAG" --repo "$UPSTREAM_REPO" --dir release-assets \
-                    --pattern "zxPluginsInject_v*.dylib"
                   ZX_DYLIB="$(ls -t release-assets/zxPluginsInject_v*.dylib 2>/dev/null | head -n1 || true)"
-                  [ -n "$ZX_DYLIB" ] || { echo "::error::zxPluginsInject dylib not found in release $TAG (enable include_zxinject when releasing)."; exit 1; }
+                  [ -n "$ZX_DYLIB" ] || { echo "::error::zxPluginsInject dylib not found."; exit 1; }
                   echo "ZX_DYLIB=${ZX_DYLIB}" >> "$GITHUB_ENV"
                 fi
 
                 if [ "${{ inputs.build_noplugins }}" = "true" ]; then
-                  gh release download "$TAG" --repo "$UPSTREAM_REPO" --dir release-assets \
-                    --pattern "NoPluginsPatch_v*.dylib"
                   NP_DYLIB="$(ls -t release-assets/NoPluginsPatch_v*.dylib 2>/dev/null | head -n1 || true)"
-                  [ -n "$NP_DYLIB" ] || { echo "::error::NoPluginsPatch dylib not found in release $TAG (enable include_noplugins_patch when releasing)."; exit 1; }
+                  [ -n "$NP_DYLIB" ] || { echo "::error::NoPluginsPatch dylib not found."; exit 1; }
                   echo "NP_DYLIB=${NP_DYLIB}" >> "$GITHUB_ENV"
                 fi
 
@@ -157,7 +154,6 @@ jobs:
 
                 rm -rf "$STAGE"
                 ls -la packages
-                ls -la packages/RyukGram.bundle | head -20
 
             - name: Prepare Instagram IPA
               env:
@@ -178,22 +174,6 @@ jobs:
                   -f packages/RyukGram.dylib packages/RyukGram.bundle \
                   -c 9 -m 15.0 -du
 
-                APPEX_SRC="extensions/OpenInstagramSafariExtension.appex"
-                if [ -d "$APPEX_SRC" ]; then
-                  echo "Embedding Safari extension"
-                  INJECT_TMP="$(mktemp -d)"
-                  unzip -q packages/RyukGram-sideloaded.ipa -d "$INJECT_TMP"
-                  APP_DIR="$(find "$INJECT_TMP/Payload" -maxdepth 1 -type d -name '*.app' | head -1)"
-                  if [ -n "$APP_DIR" ]; then
-                    mkdir -p "$APP_DIR/PlugIns"
-                    rm -rf "$APP_DIR/PlugIns/OpenInstagramSafariExtension.appex"
-                    cp -R "$APPEX_SRC" "$APP_DIR/PlugIns/"
-                    ( cd "$INJECT_TMP" && zip -qr -9 ../repacked.ipa Payload )
-                    mv "$INJECT_TMP/../repacked.ipa" packages/RyukGram-sideloaded.ipa
-                  fi
-                  rm -rf "$INJECT_TMP"
-                fi
-
                 echo "Running ipapatch (zxPluginsInject LC injection)"
                 ipapatch \
                   --input packages/RyukGram-sideloaded.ipa \
@@ -201,7 +181,6 @@ jobs:
                   --dylib packages/zxPluginsInject.dylib
 
                 mv packages/RyukGram-sideloaded.ipa "packages/RyukGram_sideloaded_v${VERSION}.ipa"
-                ls -la packages
 
             - name: Build no-plugins IPA (cyan + NoPluginsPatch, appex stripped)
               if: ${{ inputs.build_noplugins }}
@@ -225,7 +204,6 @@ jobs:
                 rm -rf "$INJECT_TMP"
 
                 mv packages/RyukGram-noplugins.ipa "packages/RyukGram_noplugins_v${VERSION}.ipa"
-                ls -la packages
 
             - name: Upload sideload IPA artifact
               if: ${{ inputs.upload_artifact && inputs.build_sideload }}
